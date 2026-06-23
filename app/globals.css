@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+:root {
+  --font-vazir: var(--font-vazir);
+  --font-space: var(--font-space);
+}
+
+body {
+  font-family: var(--font-vazir), system-ui, sans-serif;
+}
+
+/* Custom scrollbars for a premium dark look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Base custom classes */
+.font-vazir {
+  font-family: var(--font-vazir), system-ui, sans-serif;
+}
+
+.font-space {
+  font-family: var(--font-space), monospace;
+}
