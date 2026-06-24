@@ -8,22 +8,27 @@ let lastConnectionString = "";
 let currentPool: any = null;
 let currentDrizzle: any = null;
 
-/**
- * در Cloudflare Workers، متغیرهای محیطی از طریق process.env در دسترس نیستند.
- * باید از طریق آبجکت env (که Cloudflare موقع هر request پاس می‌دهد) خوانده شوند.
- * این تابع باید با env.HYPERDRIVE.connectionString صدا زده شود.
- */
-export function getLatestDb(env?: any) {
-  // اولویت با Hyperdrive binding است (روش درست برای Cloudflare Workers)
-  let connectionString =
-    env?.HYPERDRIVE?.connectionString ||
-    env?.DATABASE_URL ||
-    // fallback برای اجرای لوکال (npm run dev) که در آن process.env کار می‌کند
-    (typeof process !== "undefined" ? process.env?.DATABASE_URL : "") ||
+export function getLatestDb() {
+  let connectionString = 
+    process.env.DATABASE_URL  
+    process.env.SUPABASE_DATABASE_URL  
+    process.env.SQL_DATABASE_URL  
     "";
 
+  // Fallback: search process.env for any key whose value starts with postgres:// or postgresql://
+  if (!connectionString) {
+    const keys = Object.keys(process.env);
+    for (const key of keys) {
+      const val = process.env[key]  "";
+      if (val.startsWith("postgres://")  val.startsWith("postgresql://")) {
+        connectionString = val;
+        break;
+      }
+    }
+  }
+
   // Re-initialize pool if connection string changed (or on first load)
-  if (!currentDrizzle || connectionString !== lastConnectionString) {
+  if (!currentDrizzle  connectionString !== lastConnectionString) {
     if (currentPool) {
       currentPool.end().catch(() => {});
     }
@@ -31,18 +36,28 @@ export function getLatestDb(env?: any) {
     lastConnectionString = connectionString;
 
     if (connectionString) {
+      const isPlaceholder = 
+        connectionString.includes("[YOUR-PASSWORD]")  
+        connectionString.includes("[YOUR_PASSWORD]")  
+        connectionString.includes("YOUR-PASSWORD");
+
       currentPool = new Pool({
-        connectionString,
+        connectionString: isPlaceholder
+          ? "postgresql://postgres:PLACEHOLDER@localhost:5432/postgres"
+          : connectionString,
         connectionTimeoutMillis: 15000,
-        // Hyperdrive خودش SSL را مدیریت می‌کند، پس این فقط برای اتصال لوکال/مستقیم لازم است
-        ssl: connectionString.includes("supabase") || connectionString.includes("neon") || connectionString.includes("aws")
+        ssl: connectionString.includes("supabase")  connectionString.includes("neon")  connectionString.includes("aws")
           ? { rejectUnauthorized: false }
           : undefined,
       });
     } else {
-      throw new Error(
-        "DATABASE_URL پیدا نشد. مطمئن شو Hyperdrive binding (HYPERDRIVE) را در wrangler.jsonc تعریف کرده‌ای و آن را به Worker پاس می‌دهی."
-      );
+      currentPool = new Pool({
+        host: process.env.SQL_HOST  "localhost",
+        user: process.env.SQL_USER  "postgres",
+        password: process.env.SQL_PASSWORD  "postgres",
+        database: process.env.SQL_DB_NAME  "postgres",
+        connectionTimeoutMillis: 15000,
+      });
     }
 
     currentPool.on("error", (err: any) => {
@@ -55,23 +70,12 @@ export function getLatestDb(env?: any) {
   return currentDrizzle;
 }
 
-/**
- * توجه: استفاده از این Proxy فقط برای محیط لوکال (Node.js) که process.env کار می‌کند مناسب است.
- * در کد سمت Worker (روی Cloudflare)، باید مستقیماً getLatestDb(env) را در هر route/handler صدا بزنی
- * تا Hyperdrive binding درست پاس داده شود. مثال:
- *
- *   export default {
- *     async fetch(request, env, ctx) {
- *       const db = getLatestDb(env);
- *       const result = await db.select().from(schema.users);
- *       ...
- *     }
- *   }
- */
+// Proxy all property accesses to the dynamically loaded drizzle instance
 export const db = new Proxy({} as any, {
   get(target, prop, receiver) {
     const underlyingDb = getLatestDb();
     const val = Reflect.get(underlyingDb, prop, receiver);
+    // If the value is a function (like db.select, db.insert, etc), bind it to the real db context
     if (typeof val === "function") {
       return val.bind(underlyingDb);
     }
