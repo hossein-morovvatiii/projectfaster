@@ -43,6 +43,7 @@ export default function LoginPage() {
     try {
       // 1. First fetch latest accounts from Supabase hossien_users table
       let fetchedUsers = [];
+      let serverErrorMessage = "";
       try {
         const response = await fetch("/api/supabase", {
           method: "POST",
@@ -54,6 +55,8 @@ export default function LoginPage() {
           fetchedUsers = result.data;
           // Synchronize/cache to localStorage for offline robustness
           localStorage.setItem("vault_all_users_cache", JSON.stringify(fetchedUsers));
+        } else if (!result.success) {
+          serverErrorMessage = result.error_fa || result.message || "خطای نامشخص از سرور دیتابیس.";
         }
       } catch (err) {
         console.warn("Could not grab remote users, fallback to cached users.", err);
@@ -79,7 +82,7 @@ export default function LoginPage() {
       }
 
       if (userPool.length === 0) {
-        setErrorMessage("امکان اتصال به دیتابیس وجود ندارد و نسخه‌ی ذخیره‌شده‌ای از کاربران در دسترس نیست. لطفاً اتصال اینترنت یا تنظیمات دیتابیس را بررسی کنید.");
+        setErrorMessage(serverErrorMessage || "امکان اتصال به دیتابیس وجود ندارد و نسخه‌ی ذخیره‌شده‌ای از کاربران در دسترس نیست. لطفاً اتصال اینترنت یا تنظیمات دیتابیس را بررسی کنید.");
         setIsSubmitLoading(false);
         return;
       }
@@ -127,7 +130,9 @@ export default function LoginPage() {
       };
 
       localStorage.setItem("vault_user", JSON.stringify(sessionUser));
-      
+      // Also set a session cookie so the server-side middleware can verify auth on every request
+      document.cookie = `vault_session=${encodeURIComponent(sessionUser.username)}; path=/; max-age=2592000; SameSite=Lax`;
+
       // Navigate to main app
       router.push("/");
     } catch (err) {
@@ -148,6 +153,7 @@ export default function LoginPage() {
     };
 
     localStorage.setItem("vault_user", JSON.stringify(guestUser));
+    document.cookie = `vault_session=${encodeURIComponent(guestUser.username)}; path=/; max-age=2592000; SameSite=Lax`;
     router.push("/");
   };
 
