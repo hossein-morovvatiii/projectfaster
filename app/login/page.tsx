@@ -3,13 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
-import { KeyRound, User, ChevronLeft, Shield, AlertTriangle, Eye, EyeOff } from "lucide-react";
-
-// Standard starter user accounts for robust fallback
-const DEFAULT_ACCOUNT_POOL = [
-  { id: "user-admin", username: "admin", password: "admin", name: "System Admin", is_admin: true, role: "super_admin", parent_id: null as (string | null), is_suspended: false },
-  { id: "user-editor", username: "editor", password: "editor", name: "Senior Editor", is_admin: false, role: "editor", parent_id: null as (string | null), is_suspended: false }
-];
+import { KeyRound, User, ChevronLeft, Shield, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -65,8 +59,8 @@ export default function LoginPage() {
         console.warn("Could not grab remote users, fallback to cached users.", err);
       }
 
-      // 2. Load cached users pool or fallback to defaults
-      let userPool: any[] = [...DEFAULT_ACCOUNT_POOL];
+      // 2. Load cached users pool (synced from the database on a previous successful fetch)
+      let userPool: any[] = [];
       if (typeof window !== "undefined") {
         const cached = localStorage.getItem("vault_all_users_cache");
         if (cached) {
@@ -79,12 +73,16 @@ export default function LoginPage() {
         }
       }
 
-      // Always ensure system defaults exist in pool if not already present
-      DEFAULT_ACCOUNT_POOL.forEach(defAcc => {
-        if (!userPool.some(u => u.username === defAcc.username)) {
-          userPool.push(defAcc);
-        }
-      });
+      // Prefer the freshly fetched list from the database over the cache, when available
+      if (fetchedUsers.length > 0) {
+        userPool = fetchedUsers;
+      }
+
+      if (userPool.length === 0) {
+        setErrorMessage("امکان اتصال به دیتابیس وجود ندارد و نسخه‌ی ذخیره‌شده‌ای از کاربران در دسترس نیست. لطفاً اتصال اینترنت یا تنظیمات دیتابیس را بررسی کنید.");
+        setIsSubmitLoading(false);
+        return;
+      }
 
       // 3. Find matching user
       const targetUser = userPool.find(
@@ -274,11 +272,6 @@ export default function LoginPage() {
               <Shield className="w-3.5 h-3.5" />
               <span className="font-bold">Log in as Guest (Offline)</span>
             </button>
-
-            <div className="flex items-start gap-1.5 p-2 bg-yellow-500/5 rounded-lg border border-yellow-500/10 text-[9px] text-yellow-400 leading-relaxed font-normal">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-              <span>Guest users are not allowed to auto-save directly to the database and must download backups manually. Default system admin credentials are username <code className="bg-white/[0.06] px-1 rounded text-white font-mono">admin</code> and password <code className="bg-white/[0.06] px-1 rounded text-white font-mono">admin</code>.</span>
-            </div>
           </div>
         </motion.div>
       </div>
