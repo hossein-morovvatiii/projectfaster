@@ -9,18 +9,18 @@ let currentPool: any = null;
 let currentDrizzle: any = null;
 
 export function getLatestDb() {
-  let connectionString = 
-    process.env.DATABASE_URL  
-    process.env.SUPABASE_DATABASE_URL  
-    process.env.SQL_DATABASE_URL  
+  let connectionString =
+    process.env.DATABASE_URL ||
+    process.env.SUPABASE_DATABASE_URL ||
+    process.env.SQL_DATABASE_URL ||
     "";
 
   // Fallback: search process.env for any key whose value starts with postgres:// or postgresql://
   if (!connectionString) {
     const keys = Object.keys(process.env);
     for (const key of keys) {
-      const val = process.env[key]  "";
-      if (val.startsWith("postgres://")  val.startsWith("postgresql://")) {
+      const val = process.env[key] || "";
+      if (val.startsWith("postgres://") || val.startsWith("postgresql://")) {
         connectionString = val;
         break;
       }
@@ -28,7 +28,7 @@ export function getLatestDb() {
   }
 
   // Re-initialize pool if connection string changed (or on first load)
-  if (!currentDrizzle  connectionString !== lastConnectionString) {
+  if (!currentDrizzle || connectionString !== lastConnectionString) {
     if (currentPool) {
       currentPool.end().catch(() => {});
     }
@@ -36,9 +36,9 @@ export function getLatestDb() {
     lastConnectionString = connectionString;
 
     if (connectionString) {
-      const isPlaceholder = 
-        connectionString.includes("[YOUR-PASSWORD]")  
-        connectionString.includes("[YOUR_PASSWORD]")  
+      const isPlaceholder =
+        connectionString.includes("[YOUR-PASSWORD]") ||
+        connectionString.includes("[YOUR_PASSWORD]") ||
         connectionString.includes("YOUR-PASSWORD");
 
       currentPool = new Pool({
@@ -46,16 +46,16 @@ export function getLatestDb() {
           ? "postgresql://postgres:PLACEHOLDER@localhost:5432/postgres"
           : connectionString,
         connectionTimeoutMillis: 15000,
-        ssl: connectionString.includes("supabase")  connectionString.includes("neon")  connectionString.includes("aws")
+        ssl: connectionString.includes("supabase") || connectionString.includes("neon") || connectionString.includes("aws")
           ? { rejectUnauthorized: false }
           : undefined,
       });
     } else {
       currentPool = new Pool({
-        host: process.env.SQL_HOST  "localhost",
-        user: process.env.SQL_USER  "postgres",
-        password: process.env.SQL_PASSWORD  "postgres",
-        database: process.env.SQL_DB_NAME  "postgres",
+        host: process.env.SQL_HOST || "localhost",
+        user: process.env.SQL_USER || "postgres",
+        password: process.env.SQL_PASSWORD || "postgres",
+        database: process.env.SQL_DB_NAME || "postgres",
         connectionTimeoutMillis: 15000,
       });
     }
