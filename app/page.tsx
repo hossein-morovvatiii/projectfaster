@@ -528,6 +528,7 @@ export default function Home() {
   const handleLogout = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("vault_user");
+      document.cookie = "vault_session=; path=/; max-age=0";
       window.location.href = "/login";
     }
   };
